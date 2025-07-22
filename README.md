@@ -1,8 +1,9 @@
 # Virtua_Pet
-This is a tiny little project I made to get my own Virtual Pet. I hope you like it as much as I do. /n
-The code can receive some optimiztion, so feel free to change it as you like. /n
-I would be glade to see your project too if you choose to make one pet by yourself. /n
-Thank you! /n
+This is a tiny little project I made to get my own Virtual Pet. I hope you like it as much as I do. 
+The code can receive some optimiztion, so feel free to change it as you like. 
+All the bitmap sprites are on the bitmap.h file.
+I would be glade to see your project too if you choose to make one pet by yourself. 
+Thank you! 
 
 HARDWARE: 
 - STM32 F103C8T6 (Blue Pill); (It demands at least 3.5KB RAM and 32KB ROM)
