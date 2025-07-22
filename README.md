@@ -1,10 +1,10 @@
 # Virtua_Pet
-This is a tiny little project I made to get my own Virtual Pet. I hope you like it as much as I do.
-The code can receive some optimiztion, so feel free to change it as you like.
-I would be glade to see your project too if you choose to make one pet by yourself.
-Thank you!
+This is a tiny little project I made to get my own Virtual Pet. I hope you like it as much as I do. /n
+The code can receive some optimiztion, so feel free to change it as you like. /n
+I would be glade to see your project too if you choose to make one pet by yourself. /n
+Thank you! /n
 
-HARDWARE:
+HARDWARE: 
 - STM32 F103C8T6 (Blue Pill); (It demands at least 3.5KB RAM and 32KB ROM)
 - 1.3" OLED I2C Screen 128x64;
 - 4 push buttons (with 1n4148 diode to prevent debounce);
