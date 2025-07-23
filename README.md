@@ -1,6 +1,6 @@
 # Virtua_Pet
 This is a tiny little project I made to get my own Virtual Pet. I hope you like it as much as I do. 
-The code can receive some optimiztion, so feel free to change it as you like. 
+The code was written in the Arduino IDE and can receive some optimiztion, so feel free to change it as you like. 
 All the bitmap sprites are on the bitmap.h file.
 I would be glade to see your project too if you choose to make one pet by yourself. 
 Thank you! 
