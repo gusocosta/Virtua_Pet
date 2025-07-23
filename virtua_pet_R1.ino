@@ -201,14 +201,16 @@ void time_check(){
       if (act_time[1] >= 60){ //check hours
         act_time[1] = 0;
         act_time[2] += 1;
-        if (act_time[1] >= 24){ //check days
-          act_time[2] = 0;
-          act_time[3] += 1;
-					if (pet_lvl == 1){
-						evolve_ani = true;
-					}
-        }
-      }
+			}
+
+			if (act_time[2] >= 24){ //check days
+				act_time[2] = 0;
+				act_time[3] += 1;
+				if (pet_lvl == 1){
+					evolve_ani = true;
+				}
+			}
+      
     }
   }
 }
