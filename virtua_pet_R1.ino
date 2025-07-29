@@ -11,6 +11,8 @@ HARDWARE:
 - 1.3" OLED I2C Screen 128x64;
 - 4 push buttons (with 1n4148 diode to prevent debounce);
 
+NOTE: Disable the USB serial communication for more ROM space
+
 by Gus Costa
 (GitHub: gusocosta)
 (Reddit: gu-ocosta)
@@ -19,6 +21,8 @@ by Gus Costa
 
 #include <GyverOLED.h>
 #include "bitmaps.h"
+//Choose your screen protocol
+//GyverOLED<SSD1306_128x64> oled; 
 GyverOLED<SSH1106_128x64> oled;
 
 //Peripheral constants
@@ -28,6 +32,7 @@ const uint8_t bt_up = PA11;
 const uint8_t bt_left = PA12;
 
 //Time vars and const
+bool timer_rolling = false;
 const uint8_t check_pet_time = 5; //in sec
 uint32_t draw_tick = 0;
 uint8_t draw_tick_max = 100;
@@ -75,16 +80,23 @@ uint8_t pet_mood = 0; //0: normal, 1: happy, 2: sleep, 3:dead
 uint8_t pet_doing = 0; //0: nothing, 1: eating tomato, 2: eating carrot, 3: eating mushroom, 4: eating chicken, 5: eating candy, 6: cleaning, 7: petting, 8: sleeping, 9: dead
 bool pet_alive = true;
 bool pet_sleeping = false;
-bool pet_poop = false;
+bool pet_poop = true;
 uint8_t pet_ani = 0;
-uint8_t food_check[5] = {0,0,0,0,0};
+uint8_t food_check[5] = {0,0,0,0,0}; //0: tomato, 1: carrot, 2: mushroom, 3: chicken, 4: candy
 bool happy_fail = false; //vars to check for evolution
 bool health_fail = false; //vars to check for evolution
+
+//Name vars and consts
+char ascii_alphabet[63] = {}; //all the alphabet. 26 Uppercases, 26 lowercases, 10 numbers and underscore
+char name_letters_array[8] = {95,95,95,95,95,95,95,95}; //the characters that compose the pet's name
+String pet_name = "";
+uint8_t ascii_letter_count[8] = {62,62,62,62,62,62,62,62};
+uint8_t name_letters_indicator = 0; //0 to 7 for the letters, 8 for the "Next" button
 
 //UI vars and consts
 uint32_t rng_comp = 0;
 int rng_dir = 1;
-uint8_t screen = 1; //0: name, 1: main, 2: status
+uint8_t screen = 0; //0: name, 1: main, 2: status
 uint8_t sel = 0;
 uint8_t food_sel = 0; //0: tomato, 1: carrot, 2: mushroom, 3: chicken, 4: candy
 const uint8_t bottom_bar_size = 5;
@@ -118,47 +130,43 @@ const unsigned char* trex_up[1][2] = {{trex_up1, trex_up2}};
 const unsigned char* trex_eyes[3][2] = {{trex_eye_n1, trex_eye_n2},{trex_eye_h1, trex_eye_h2},{trex_eye_s1, trex_eye_s2}};
 
 void setup() {
-  Serial.begin(9600);
+	delay(10);
   pinMode(bt_left, INPUT_PULLUP);
   pinMode(bt_right, INPUT_PULLUP);
   pinMode(bt_up, INPUT_PULLUP);
   pinMode(bt_down, INPUT_PULLUP);
-  //pinMode(buzz, OUTPUT);
 	
   oled.init();
   oled.clear();
 	bottom_bar_gen();
 	age_gen();
+	alphabet_gen();
 
 	rng_comp = int(millis()+analogRead(PA0));
 	if (rng_comp % 2 == 0){pet_sex = 1;}
 }
 
-// Generates the bottom bar
-void bottom_bar_gen(){
-	bottom_bar_sel_size = 127 / bottom_bar_size;
-	for(uint8_t i = 0; i < bottom_bar_size; i++){
-		bottom_bar_pos[i] = (i* bottom_bar_sel_size) + ((bottom_bar_sel_size - 8)/2);
+//========================================================================
+//============================ Name Functions ============================
+//========================================================================
+
+void alphabet_gen(){
+	uint8_t char_count = 65;
+	for (uint8_t i=0; i<26; i++){ //Uppercase
+		ascii_alphabet[i] = char_count + i;
 	}
+	char_count = 97;
+	for (uint8_t i=0; i<26; i++){ //Lowercase
+		ascii_alphabet[26 + i] = char_count + i;
+	}
+	char_count = 48;
+	for (uint8_t i=0; i<10; i++){ //numbers
+		ascii_alphabet[52 + i] = char_count + i;
+	}
+	ascii_alphabet[62] = 95; //add space 
 }
 
-// Make the age string on the status screen
-void age_gen(){
-	if (pet_alive == true){
-		if (act_time[3]!=0){
-			pet_age = String(act_time[3]) + "D";
-		}
-		else if (act_time[2]!=0){
-			pet_age = String(act_time[2]) + "H";
-		}
-		else if (act_time[1]!=0){
-			pet_age = String(act_time[1]) + "m";
-		}
-		else{
-			pet_age = "0m";
-		}
-	}
-}
+
 //========================================================================
 //============================= Time Function ============================
 //========================================================================
@@ -215,19 +223,42 @@ void time_check(){
   }
 }
 
+//========================================================================
+//================================ Buttons ===============================
+//========================================================================
 void check_bt(){
-	//========================================================================
 	//=============================== Button Up ==============================
-	//========================================================================
 	if (digitalRead(bt_up) == LOW){
 		rng_comp += int(buttom_cooldown_millis - millis()) * rng_dir;
 		rng_dir *= -1;
 
 		if(millis() > buttom_cooldown_millis + buttom_cooldown){ //debounce
 			buttom_cooldown_millis = millis();
-			
+
+			//Name Screen
+			if (screen == 0){
+				if(name_letters_indicator !=8){
+					ascii_letter_count[name_letters_indicator] = func_select(ascii_letter_count[name_letters_indicator], 62, 1);
+					name_letters_array[name_letters_indicator] = ascii_alphabet[ascii_letter_count[name_letters_indicator]];
+					}
+				else{
+					uint8_t letter_count = 0;
+					for(uint8_t i =0; i < 8; i++){ //Counting the written letters
+						if(name_letters_array[7-i] != 95){
+							letter_count = 7-i;
+							break;
+						}
+					}
+					for(uint8_t i =0; i <= letter_count; i++){ //Saving the name
+						pet_name += name_letters_array[i];
+					}
+
+					timer_rolling = true;
+					screen = 1;
+				}
+			}
 			//Main Screen
-			if (screen == 1){
+			else if (screen == 1){
         if (pet_alive == true && doing_tick < millis()){
           if (sel == 0){ //Eating
             if (pet.hungry < 100){
@@ -240,7 +271,7 @@ void check_bt(){
 							pet.happy += pet_eating_vars[pet_species][food_sel][3];
 							pet.sleep += pet_eating_vars[pet_species][food_sel][4];
 
-							food_check[food_sel] += 1;
+							food_check[food_sel] += 1; //0: tomato, 1: carrot, 2: mushroom, 3: chicken, 4: candy
               pet_mood = 1;
 							pet_sleeping = false;
             }
@@ -294,9 +325,7 @@ void check_bt(){
 		}
 	}
 
-	//========================================================================
 	//============================== Button Down =============================
-	//========================================================================
 	if (digitalRead(bt_down) == LOW){
 		rng_comp += int(buttom_cooldown_millis - millis()) * rng_dir;
 		rng_dir *= -1;
@@ -304,7 +333,16 @@ void check_bt(){
 		if(millis() > buttom_cooldown_millis + buttom_cooldown){ //debounce
 			buttom_cooldown_millis = millis();
 
-			if (screen == 1){
+			//Name Screen
+			if (screen == 0){
+				if(name_letters_indicator !=8){
+					ascii_letter_count[name_letters_indicator] = func_select(ascii_letter_count[name_letters_indicator], 62, 0);
+					name_letters_array[name_letters_indicator] = ascii_alphabet[ascii_letter_count[name_letters_indicator]];
+				}
+			}
+
+			//Main Screen
+			else if (screen == 1){
         if (pet_alive == true && doing_tick < millis()){
           if (sel == 0){ //Eating
 						food_sel = func_select(food_sel, 4, 1);
@@ -313,20 +351,27 @@ void check_bt(){
 				}
 			}
 
+			//Status Screen
+			else if (screen == 2){
+				screen = 1;
+			}
 		}
 	}
 
-	//========================================================================
 	//============================== Button Left =============================
-	//========================================================================
 	if (digitalRead(bt_left) == LOW){
 		rng_comp += int(buttom_cooldown_millis - millis()) * rng_dir;
 		rng_dir *= -1;
 		if(millis() > buttom_cooldown_millis + buttom_cooldown){ //debounce
 			buttom_cooldown_millis = millis();
 
+			//Name Screen
+			if (screen == 0){
+				name_letters_indicator = func_select(name_letters_indicator, 8, 0);
+			}
+			
 			//Main Screen
-			if (screen == 1){
+			else if (screen == 1){
 				sel = func_select(sel, bottom_bar_size-1, 0);
 			}
 			
@@ -337,29 +382,32 @@ void check_bt(){
 		}
 	}
 
-	//========================================================================
 	//============================= Button Right =============================
-	//========================================================================
 	if (digitalRead(bt_right) == LOW){
 		rng_comp += int(buttom_cooldown_millis - millis()) * rng_dir;
 		rng_dir *= -1;
 		if(millis() > buttom_cooldown_millis + buttom_cooldown){ //debounce
 			buttom_cooldown_millis = millis();
 
+			//Name Screen
+			if (screen == 0){
+				name_letters_indicator = func_select(name_letters_indicator, 8, 1);
+			}
+
 			//Main Screen
-			if (screen == 1){
+			else if (screen == 1){
 				sel = func_select(sel, bottom_bar_size - 1, 1);
 			}
 
 			//Status Screen
 			else if (screen == 2){
-			
+				screen = 1;
 			}
 		}
 	}
 }
 
-uint8_t func_select(uint8_t var, uint8_t max, uint8_t dir){
+uint8_t func_select(uint8_t var, uint8_t max, uint8_t dir){ //dir 0: negative, 1:positive
 	if(dir > 0){
 		if(var < max){var += 1;}
 		else{var = 0;}
@@ -439,7 +487,7 @@ void check_pet(){
 	if (pet.health <= 50){
 		health_fail = true;
 	}
-	if (pet.happy <= 70){
+	if (pet.happy <= 50){
 		happy_fail = true;
 	}
 
@@ -449,15 +497,15 @@ void check_pet(){
 void evolve(){
 	switch (pet_lvl){
 		case 0:
-			pet_species = 1;
+			pet_species = 1; 
 		break;
-		case 1:
+		case 1: 
 			pet_species = 2; //evolve to Bunny
-			if (happy_fail == false && food_check[0] == 0 && food_check[1] == 0 && food_check[2] == 0){ //evolve to T-Rex
-				pet_species = 4;
+			if (happy_fail == false && health_fail == false && food_check[0] == 0 && food_check[1] == 0 && food_check[2] == 0){ //(only eats chicken or candy) - food_check: 0: tomato, 1: carrot, 2: mushroom, 3: chicken, 4: candy
+				pet_species = 4; //evolve to T-Rex 
 			}
-			else if (health_fail == false && food_check[0] > 0 && food_check[1] > 0 && food_check[2] > 0 && food_check[3] == 0){ //evolve to Dino
-				pet_species = 3;
+			else if (health_fail == false && food_check[0] > 0 && food_check[1] > 0 && food_check[2] > 0 && food_check[3] == 0){ //(eats every vegetable. can eat candy too) - food_check: 0: tomato, 1: carrot, 2: mushroom, 3: chicken, 4: candy
+				pet_species = 3; //evolve to Dino
 			}
 		break;
 	}
@@ -472,6 +520,10 @@ void clamp_pet(){
 	if(pet.sleep > 200){pet.sleep = 200;}
 }
 
+//========================================================================
+//================================ Misc ==================================
+//========================================================================
+
 void ani_check(){
 		if (pet_mood == 0) {
 				pet_ani = ani_tick % 2;
@@ -485,6 +537,32 @@ void ani_check(){
 		else if (pet_mood == 3) {
 				pet_ani = 5;
 		}
+}
+
+// Generates the bottom bar
+void bottom_bar_gen(){
+	bottom_bar_sel_size = 127 / bottom_bar_size;
+	for(uint8_t i = 0; i < bottom_bar_size; i++){
+		bottom_bar_pos[i] = (i* bottom_bar_sel_size) + ((bottom_bar_sel_size - 8)/2);
+	}
+}
+
+// Make the age string on the status screen
+void age_gen(){
+	if (pet_alive == true){
+		if (act_time[3]!=0){
+			pet_age = String(act_time[3]) + "D";
+		}
+		else if (act_time[2]!=0){
+			pet_age = String(act_time[2]) + "H";
+		}
+		else if (act_time[1]!=0){
+			pet_age = String(act_time[1]) + "m";
+		}
+		else{
+			pet_age = "0m";
+		}
+	}
 }
 
 void resize(const uint8_t* bmp, uint16_t w, uint16_t h, int16_t x0, int16_t y0, uint8_t scale) {
@@ -544,6 +622,30 @@ void draw(){
 	oled.line(0, 10, 127, 10);
 
 	//========================================================================
+	//===============================Name Screen==============================
+	//========================================================================
+	if (screen == 0){
+		draw_sex(1, 16);
+		oled.setCursor(16,3);
+		oled.setScale(2);
+		draw_letter_scroll();
+		oled.setScale(1);
+	
+		if (name_letters_indicator == 8){
+			oled.invertText(true);
+		}
+		oled.setCursorXY(91,55);
+		oled.print("Start!");
+		oled.invertText(false);
+
+		oled.rect(89,53,127,63,2);
+		if (name_letters_indicator == 8){
+			oled.line(90,54,90,63);
+			oled.line(90,54,127,54);
+		}
+		
+	}
+	//========================================================================
 	//===============================Main Screen==============================
 	//========================================================================
 	if (screen == 1){
@@ -564,7 +666,7 @@ void draw(){
 		}
 
 		if (pet_poop == true){
-			 resize(icon_poop, 8, 8, 112, 32, 2); //bmp, w, h, x0, y0, scale
+			 resize(icon_poop, 8, 8, 104, 32, 2); //bmp, w, h, x0, y0, scale
 		}
 
 		//draw bottom bar
@@ -582,6 +684,10 @@ void draw(){
 				oled.drawBitmap(bottom_bar_pos[i], 55, bottom_bar_icons[i-1], 8, 8, 0, invert_sprite);
 			}
 		}
+
+		if (evolve_ani == true){
+			draw_explosion();
+		}
 	}
 
 	//========================================================================
@@ -589,14 +695,15 @@ void draw(){
 	//========================================================================
 	else if(screen == 2){
 		//Draw Infos
-		if (pet_sex == 0) {oled.drawBitmap(1, 16, icon_fem, 8, 8);}
-		else {oled.drawBitmap(1, 16, icon_male, 8, 8);}
+		draw_sex(1, 16);
 		oled.setCursorXY(12, 16);
-		oled.print(pet_all_species[pet_species]);
+		oled.print(pet_name);
 		oled.setCursorXY(1, 28);
+		oled.print(pet_all_species[pet_species]);
+		oled.setCursorXY(1, 40);
 		oled.print("Age: ");
 		oled.print(pet_age);
-		oled.setCursorXY(1, 40);
+		oled.setCursorXY(1, 52);
 		oled.print("Lvl: ");
 		if(pet_lvl < 2){oled.print(pet_lvl);}
 		else{oled.print("MAX");}
@@ -625,21 +732,14 @@ void draw(){
 				oled.rect(66 + (i*13), 18 + (34 - (34 * pet.happy)/100), 70 + (i*13), 52);
 			}
 		}
-
-		//Draw Back Button
-		oled.rect(0, 55, 6, 63);
-		oled.setCursor(1, 7);
-		oled.invertText(true);
-		oled.print("<");
-		oled.invertText(false);
-	}
-
-	if (evolve_ani == true){
-		draw_explosion();
 	}
   oled.update();
 }
 
+void draw_sex(uint8_t x, uint8_t y){
+	if (pet_sex == 0) {oled.drawBitmap(x, y, icon_fem, 8, 8);}
+	else {oled.drawBitmap(x, y, icon_male, 8, 8);}
+}
 //Solving the sprite puzzle
 void draw_pet(){
 	uint8_t animation_eyes;
@@ -715,9 +815,22 @@ void draw_explosion(){
 	}
 }
 
+void draw_letter_scroll(){
+	for(uint8_t i=0; i<8; i++){
+		if (i == name_letters_indicator){
+			oled.invertText(true);
+		}
+		oled.print(name_letters_array[i]);
+		oled.invertText(false);
+	}
+}
+
 void loop() {
   check_bt();
-  time_check();
+
+	if (timer_rolling == true){
+  	time_check();
+	}
 
 	if(millis() > draw_tick + draw_tick_max){ //controls the screens refresh to save some battery
 		draw_tick = millis();
