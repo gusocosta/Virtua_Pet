@@ -13,6 +13,9 @@ HARDWARE:
 WIREING:
 I Used the pins PA9, PA10, PA11, PA12 for all the buttons, and used a diode n4048 to prevent debounce.
 The OLED display was wired at I2C1 (PB7 and PB8 for SDA and CLK).
+Note: Remember to verify the firmware of your display. It can be either SSD1306 or Sh1106. 
+
+![schematics](https://raw.githubusercontent.com/gusocosta/Virtua_Pet/refs/heads/main/schematics.png) 
 
 by: Gus Costa
 (GitHub: gusocosta)
