@@ -5,6 +5,8 @@ All the bitmap sprites are on the bitmap.h file.
 I would be glade to see your project too if you choose to make one pet by yourself. 
 Thank you! 
 
+![hardware](https://i.imgur.com/JO8UEco.jpeg)
+
 HARDWARE: 
 - STM32 F103C8T6 (Blue Pill); (It demands at least 3.5KB RAM and 32KB ROM)
 - 1.3" OLED I2C Screen 128x64;
@@ -12,6 +14,7 @@ HARDWARE:
 
 WIREING:
 I Used the pins PA9, PA10, PA11, PA12 for all the buttons, and used a diode n4048 to prevent debounce.
+There is a buzzer at PB8, but I'm not using in this project in particular. 
 The OLED display was wired at I2C1 (PB7 and PB8 for SDA and CLK).
 Note: Remember to verify the firmware of your display. It can be either SSD1306 or Sh1106. 
 
